@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-backup-config
+data:
+  S3_BUCKET: "my-mongo-backups"
+  S3_ENDPOINT: "https://s3.ir-thr-at1.arvanstorage.com"
