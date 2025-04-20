@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongo-backup-job
+spec:
+  schedule: "0 2 * * *" # Every day at 2AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: mongo-backup-sa
+          containers:
+          - name: mongo-backup
+            image: your-registry/mongodump-s5cmd:latest
+            command:
+              - /bin/bash
+              - -c
+              - |
+                export S5CMD_ENDPOINT_URL=$S3_ENDPOINT
+                export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY
+                export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY
+
+                TIMESTAMP=$(date +%F_%H-%M-%S)
+                BACKUP_DIR=/tmp/backup/$TIMESTAMP
+                mkdir -p "$BACKUP_DIR"
+                mongodump --uri="$MONGO_URI" --out="$BACKUP_DIR"
+                tar -czf /tmp/mongo-backup_$TIMESTAMP.tar.gz -C /tmp/backup $TIMESTAMP
+
+                s5cmd cp /tmp/mongo-backup_$TIMESTAMP.tar.gz s3://$S3_BUCKET/mongo-backup_$TIMESTAMP.tar.gz
+            envFrom:
+              - secretRef:
+                  name: mongo-backup-secret
+              - configMapRef:
+                  name: mongo-backup-config
+          restartPolicy: OnFailure
